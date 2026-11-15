@@ -134,10 +134,14 @@ function useScroll(targetRef: RefObject<HTMLElement | null>) {
 function App() {
   const pageRef = useRef<HTMLElement>(null)
   const sectionRef = useRef<HTMLElement>(null)
+  const filmFeatureRef = useRef<HTMLElement>(null)
+  const filmVideoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imagesRef = useRef<HTMLImageElement[]>([])
   const progressRef = useRef(0)
   const scheduleDrawRef = useRef<(() => void) | null>(null)
+  const [filmPlaying, setFilmPlaying] = useState(false)
+  const [filmMuted, setFilmMuted] = useState(false)
   const progress = useScroll(sectionRef)
   const introProgress = clamp(progress / 0.16)
 
@@ -145,6 +149,45 @@ function App() {
     progressRef.current = progress
     scheduleDrawRef.current?.()
   }, [progress])
+
+  useEffect(() => {
+    const feature = filmFeatureRef.current
+    const video = filmVideoRef.current
+    if (!feature || !video) return
+
+    let disposed = false
+    const observer = new IntersectionObserver((entries) => {
+      const entry = entries[0]
+      if (!entry) return
+
+      if (entry.isIntersecting && entry.intersectionRatio >= 0.35) {
+        const startPlayback = async () => {
+          try {
+            await video.play()
+            if (!disposed) setFilmMuted(video.muted)
+          } catch {
+            video.muted = true
+            if (!disposed) setFilmMuted(true)
+            try {
+              await video.play()
+            } catch {
+              // Keep native controls available if the browser blocks muted autoplay too.
+            }
+          }
+        }
+
+        void startPlayback()
+      } else {
+        video.pause()
+      }
+    }, { threshold: [0, 0.35] })
+
+    observer.observe(feature)
+    return () => {
+      disposed = true
+      observer.disconnect()
+    }
+  }, [])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -264,6 +307,19 @@ function App() {
             stagger: 0.14,
             ease: 'power3.out',
             scrollTrigger: { trigger: '.highlight-grid', start: 'top 82%', once: true },
+          },
+        )
+
+        gsap.fromTo(
+          '.film-feature',
+          { autoAlpha: 0, y: 42, scale: 0.985 },
+          {
+            autoAlpha: 1,
+            y: 0,
+            scale: 1,
+            duration: 1.05,
+            ease: 'power3.out',
+            scrollTrigger: { trigger: '.film-feature', start: 'top 84%', once: true },
           },
         )
 
@@ -399,6 +455,59 @@ function App() {
               <p>A warmer, more considered start—one cup, one pause, and a little room to breathe.</p>
             </article>
           </div>
+
+          <section ref={filmFeatureRef} className="film-feature" aria-labelledby="film-title">
+            <div className="film-heading">
+              <div>
+                <p className="film-kicker">THE COFFELIX FILM</p>
+                <h2 id="film-title">A ritual in motion.</h2>
+              </div>
+              <p className="film-note">Sound on for the full Coffelix experience.</p>
+            </div>
+            <div
+              className={`film-frame${filmPlaying ? ' film-frame-playing' : ''}`}
+              onPointerMove={(event) => {
+                const bounds = event.currentTarget.getBoundingClientRect()
+                event.currentTarget.style.setProperty('--pointer-x', `${event.clientX - bounds.left}px`)
+                event.currentTarget.style.setProperty('--pointer-y', `${event.clientY - bounds.top}px`)
+              }}
+            >
+              <video
+                ref={filmVideoRef}
+                className="film-video"
+                controls
+                playsInline
+                preload="metadata"
+                poster={storyImages[2]}
+                aria-label="Coffelix espresso film with audio"
+                onPlay={() => setFilmPlaying(true)}
+                onPause={() => setFilmPlaying(false)}
+                onVolumeChange={(event) => setFilmMuted(event.currentTarget.muted)}
+              >
+                <source src="/videos/coffelix%20ad.mp4" type="video/mp4" />
+                Your browser does not support embedded video.
+              </video>
+              {filmMuted && (
+                <button
+                  className="film-sound-toggle"
+                  type="button"
+                  onClick={() => {
+                    const video = filmVideoRef.current
+                    if (!video) return
+                    video.muted = false
+                    setFilmMuted(false)
+                    void video.play().catch(() => {
+                      video.muted = true
+                      setFilmMuted(true)
+                    })
+                  }}
+                >
+                  <span aria-hidden="true">♫</span> ENABLE SOUND
+                </button>
+              )}
+              <span className="film-frame-caption" aria-hidden="true">COFFELIX · THE DAILY RITUAL</span>
+            </div>
+          </section>
 
           <div className="spec-panel">
             <div className="spec-heading">
