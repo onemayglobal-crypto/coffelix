@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import coffeeBeanImage from './assets/coffee-bean-3d.png'
 import './App.css'
 
 const PRIMARY_FRAME_COUNT = 150
@@ -49,7 +50,6 @@ const storyChapters = [
     id: 'form',
     label: 'THE FORM',
     title: <>Presence<br />with purpose.</>,
-    description: 'Polished metal lines. A confident portafilter. Every detail belongs to the ritual.',
     start: 0.18,
     end: 0.41,
   },
@@ -57,7 +57,6 @@ const storyChapters = [
     id: 'pour',
     label: 'THE POUR',
     title: <>Let the moment<br />take its time.</>,
-    description: 'Follow the extraction from its first thread to a crema-topped finish, frame by frame.',
     start: 0.43,
     end: 0.76,
   },
@@ -65,7 +64,6 @@ const storyChapters = [
     id: 'pause',
     label: 'THE PAUSE',
     title: <>Made for the<br />first sip.</>,
-    description: 'One cup, one pause, and a little room to breathe.',
     start: 0.78,
     end: 0.99,
   },
@@ -133,6 +131,7 @@ function useScroll(targetRef: RefObject<HTMLElement | null>) {
 
 function App() {
   const pageRef = useRef<HTMLElement>(null)
+  const coffeeBeanRef = useRef<HTMLDivElement>(null)
   const sectionRef = useRef<HTMLElement>(null)
   const filmFeatureRef = useRef<HTMLElement>(null)
   const filmVideoRef = useRef<HTMLVideoElement>(null)
@@ -144,6 +143,52 @@ function App() {
   const [filmMuted, setFilmMuted] = useState(false)
   const progress = useScroll(sectionRef)
   const introProgress = clamp(progress / 0.16)
+
+  useEffect(() => {
+    const bean = coffeeBeanRef.current
+    if (!bean) return
+
+    let animationFrame = 0
+
+    const updateBeanPosition = () => {
+      if (animationFrame) return
+
+      animationFrame = window.requestAnimationFrame(() => {
+        animationFrame = 0
+
+        const scrollRange = document.documentElement.scrollHeight - window.innerHeight
+        const pageProgress = scrollRange > 0
+          ? clamp(window.scrollY / scrollRange)
+          : 0
+        const startY = window.innerHeight * 0.13
+        const finishY = window.innerHeight * 0.68
+        const y = startY + (finishY - startY) * pageProgress
+        const beanWidth = bean.getBoundingClientRect().width
+        const startX = window.innerWidth - beanWidth - 16
+        const finishX = (window.innerWidth - beanWidth) * 0.5
+        const x = startX + (finishX - startX) * pageProgress +
+          Math.sin(pageProgress * Math.PI) * window.innerWidth * 0.035
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        const rotation = reducedMotion ? -22 : -22 + pageProgress * 430
+
+        bean.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(${rotation}deg)`
+      })
+    }
+
+    updateBeanPosition()
+    window.addEventListener('scroll', updateBeanPosition, { passive: true })
+    window.addEventListener('resize', updateBeanPosition)
+
+    const pageResizeObserver = new ResizeObserver(updateBeanPosition)
+    if (pageRef.current) pageResizeObserver.observe(pageRef.current)
+
+    return () => {
+      window.removeEventListener('scroll', updateBeanPosition)
+      window.removeEventListener('resize', updateBeanPosition)
+      pageResizeObserver.disconnect()
+      window.cancelAnimationFrame(animationFrame)
+    }
+  }, [])
 
   useEffect(() => {
     progressRef.current = progress
@@ -280,9 +325,8 @@ function App() {
 
         intro
           .fromTo('.brand-lockup', { autoAlpha: 0, y: -12 }, { autoAlpha: 1, y: 0, duration: 0.7 })
-          .fromTo('.hero-kicker', { autoAlpha: 0, y: 18 }, { autoAlpha: 1, y: 0, duration: 0.65 }, '-=0.25')
           .fromTo('.hero-title-inner', { yPercent: 115 }, { yPercent: 0, duration: 1.05, stagger: 0.11, ease: 'power4.out' }, '-=0.25')
-          .fromTo('.hero-description, .scroll-cue', { autoAlpha: 0, y: 18 }, { autoAlpha: 1, y: 0, duration: 0.7, stagger: 0.1 }, '-=0.45')
+          .fromTo('.scroll-cue', { autoAlpha: 0, y: 18 }, { autoAlpha: 1, y: 0, duration: 0.7 }, '-=0.45')
 
         gsap.fromTo(
           '.details-kicker, .details-title, .details-lede',
@@ -345,6 +389,9 @@ function App() {
 
   return (
     <main ref={pageRef}>
+      <div ref={coffeeBeanRef} className="coffee-bean-fall" aria-hidden="true">
+        <img src={coffeeBeanImage} alt="" />
+      </div>
       <section
         id="sequence"
         ref={sectionRef}
@@ -375,15 +422,10 @@ function App() {
               transform: `translate3d(0, calc(-50% + var(--hero-text-drop) - ${30 * introProgress}px), 0)`,
             }}
           >
-            <p className="hero-kicker"><span /> THE COFFELIX POINT OF VIEW</p>
             <h1 className="hero-title">
               <span className="hero-title-line"><span className="hero-title-inner">A finer kind</span></span>
               <span className="hero-title-line hero-title-accent"><span className="hero-title-inner">of everyday.</span></span>
             </h1>
-            <p className="hero-description">
-              The best coffee moments are never rushed. Coffelix puts the ritual in focus—
-              considered form, the theater of the pour, and a beautiful finish in the cup.
-            </p>
             <div className="scroll-cue" style={{ opacity: 1 - introProgress * 0.45 }}>
               <span className="scroll-cue-line" />
               <span>SCROLL TO EXPERIENCE</span>
@@ -406,7 +448,6 @@ function App() {
                 >
                   <p className="chapter-kicker">{chapter.label}</p>
                   <h2>{chapter.title}</h2>
-                  <p className="chapter-description">{chapter.description}</p>
                 </div>
               )
             })}
@@ -533,7 +574,45 @@ function App() {
               <span>CUSTOMER CARE</span>
               <strong>1800 1890 15XX</strong>
             </div>
-            <a className="replay-link" href="#sequence">REPLAY THE POUR <span>↑</span></a>
+            <div className="footer-social-contact">
+              <div className="footer-social-logos" aria-label="Coffelix social media">
+                <span className="footer-social-logo" role="img" aria-label="Instagram" title="Instagram">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <defs>
+                      <linearGradient id="instagram-gradient" x1="3" y1="21" x2="21" y2="3" gradientUnits="userSpaceOnUse">
+                        <stop stopColor="#FFB13D" />
+                        <stop offset="0.52" stopColor="#E1306C" />
+                        <stop offset="1" stopColor="#833AB4" />
+                      </linearGradient>
+                    </defs>
+                    <rect x="2.5" y="2.5" width="19" height="19" rx="5.5" fill="url(#instagram-gradient)" />
+                    <rect x="6.5" y="6.5" width="11" height="11" rx="3.2" fill="none" stroke="white" strokeWidth="1.8" />
+                    <circle cx="12" cy="12" r="2.7" fill="none" stroke="white" strokeWidth="1.8" />
+                    <circle cx="17.7" cy="6.6" r="1.15" fill="white" />
+                  </svg>
+                </span>
+                <span className="footer-social-logo" role="img" aria-label="YouTube" title="YouTube">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path fill="#FF0033" d="M23.5 6.2a3 3 0 0 0-2.1-2.12C19.55 3.56 12 3.56 12 3.56s-7.55 0-9.4.52A3 3 0 0 0 .5 6.2C0 8.08 0 12 0 12s0 3.92.5 5.8a3 3 0 0 0 2.1 2.12c1.85.52 9.4.52 9.4.52s7.55 0 9.4-.52a3 3 0 0 0 2.1-2.12c.5-1.88.5-5.8.5-5.8s0-3.92-.5-5.8Z" />
+                    <path fill="white" d="m9.55 15.5 6.25-3.5-6.25-3.5v7Z" />
+                  </svg>
+                </span>
+                <span className="footer-social-logo" role="img" aria-label="Facebook" title="Facebook">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path fill="#0866FF" d="M24 12a12 12 0 1 0-13.88 11.86v-8.4H7.08V12h3.04V9.36c0-3 1.79-4.66 4.53-4.66 1.31 0 2.68.23 2.68.23v2.95h-1.51c-1.49 0-1.95.92-1.95 1.87V12h3.32l-.53 3.46h-2.79v8.4A12 12 0 0 0 24 12Z" />
+                  </svg>
+                </span>
+                <span className="footer-social-logo" role="img" aria-label="TikTok" title="TikTok">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path fill="#25F4EE" d="M12.8 2h3.3c.2 1.8 1.2 3.3 2.9 4.1.9.5 1.9.7 3 .8v3.4a9.4 9.4 0 0 1-5.8-1.9v7.1a6.4 6.4 0 1 1-6.4-6.4c.4 0 .8 0 1.2.1v3.5a3 3 0 1 0 1.8 2.8V2Z" transform="translate(-1.5 0)" />
+                    <path fill="#FE2C55" d="M12.8 2h3.3c.2 1.8 1.2 3.3 2.9 4.1.9.5 1.9.7 3 .8v3.4a9.4 9.4 0 0 1-5.8-1.9v7.1a6.4 6.4 0 1 1-6.4-6.4c.4 0 .8 0 1.2.1v3.5a3 3 0 1 0 1.8 2.8V2Z" transform="translate(.7 .5)" />
+                    <path fill="#111" d="M12.8 2h3.3c.2 1.8 1.2 3.3 2.9 4.1.9.5 1.9.7 3 .8v3.4a9.4 9.4 0 0 1-5.8-1.9v7.1a6.4 6.4 0 1 1-6.4-6.4c.4 0 .8 0 1.2.1v3.5a3 3 0 1 0 1.8 2.8V2Z" />
+                  </svg>
+                </span>
+              </div>
+              <a className="footer-email" href="mailto:sales@coffelix.com">sales@coffelix.com</a>
+              <a className="replay-link" href="#sequence">REPLAY THE POUR <span>↑</span></a>
+            </div>
           </footer>
         </div>
       </section>
