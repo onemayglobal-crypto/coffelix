@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import './App.css'
@@ -43,6 +43,45 @@ const frameUrls = [
   ...sortFrameUrls(primaryFrameFiles).slice(0, PRIMARY_FRAME_COUNT),
   ...sortFrameUrls(continuationFrameFiles).slice(0, CONTINUATION_FRAME_COUNT),
 ]
+
+const storyChapters = [
+  {
+    id: 'form',
+    label: 'THE FORM',
+    title: <>Presence<br />with purpose.</>,
+    description: 'Polished metal lines. A confident portafilter. Every detail belongs to the ritual.',
+    start: 0.18,
+    end: 0.41,
+  },
+  {
+    id: 'pour',
+    label: 'THE POUR',
+    title: <>Let the moment<br />take its time.</>,
+    description: 'Follow the extraction from its first thread to a crema-topped finish, frame by frame.',
+    start: 0.43,
+    end: 0.76,
+  },
+  {
+    id: 'pause',
+    label: 'THE PAUSE',
+    title: <>Made for the<br />first sip.</>,
+    description: 'One cup, one pause, and a little room to breathe.',
+    start: 0.78,
+    end: 0.99,
+  },
+]
+
+const storyImages = [frameUrls[69], frameUrls[149], frameUrls[204]]
+
+function clamp(value: number, min = 0, max = 1) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function getChapterOpacity(progress: number, start: number, end: number) {
+  const fadeIn = clamp((progress - start) / 0.035)
+  const fadeOut = clamp((end - progress) / 0.045)
+  return Math.min(fadeIn, fadeOut)
+}
 
 function getFrameIndex(progress: number) {
   const scrollPosition = Math.min(1, Math.max(0, progress)) * TOTAL_SCROLL_UNITS
@@ -100,7 +139,7 @@ function App() {
   const progressRef = useRef(0)
   const scheduleDrawRef = useRef<(() => void) | null>(null)
   const progress = useScroll(sectionRef)
-  const introProgress = Math.min(progress / 0.16, 1)
+  const introProgress = clamp(progress / 0.16)
 
   useEffect(() => {
     progressRef.current = progress
@@ -144,10 +183,13 @@ function App() {
       if (!image?.complete || !image.naturalWidth || !image.naturalHeight) return
 
       const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight)
-      const drawWidth = image.naturalWidth * scale
-      const drawHeight = image.naturalHeight * scale
-      const x = (width - drawWidth) / 2
-      const y = (height - drawHeight) / 2
+      const cinematicZoom = 1 + progressRef.current * 0.095
+      const drawWidth = image.naturalWidth * scale * cinematicZoom
+      const drawHeight = image.naturalHeight * scale * cinematicZoom
+      const panX = width * (progressRef.current - 0.5) * -0.025
+      const panY = height * (progressRef.current - 0.5) * -0.012
+      const x = (width - drawWidth) / 2 + panX
+      const y = (height - drawHeight) / 2 + panY
 
       context.imageSmoothingEnabled = true
       context.imageSmoothingQuality = 'high'
@@ -277,22 +319,46 @@ function App() {
               transform: `translate3d(0, calc(-50% + var(--hero-text-drop) - ${30 * introProgress}px), 0)`,
             }}
           >
-            <p className="hero-kicker"><span /> THE HOME ESPRESSO RITUAL</p>
+            <p className="hero-kicker"><span /> THE COFFELIX POINT OF VIEW</p>
             <h1 className="hero-title">
-              <span className="hero-title-line"><span className="hero-title-inner">A slower</span></span>
-              <span className="hero-title-line"><span className="hero-title-inner">kind of</span></span>
-              <span className="hero-title-line hero-title-accent"><span className="hero-title-inner">morning.</span></span>
+              <span className="hero-title-line"><span className="hero-title-inner">A finer kind</span></span>
+              <span className="hero-title-line hero-title-accent"><span className="hero-title-inner">of everyday.</span></span>
             </h1>
             <p className="hero-description">
-              Meet Coffelix: a considered espresso{' '}
-              <br className="laptop-only-break" />
-              ritual, from the first touch to{' '}
-              <br className="laptop-only-break" />
-              the final pour.
+              The best coffee moments are never rushed. Coffelix puts the ritual in focus—
+              considered form, the theater of the pour, and a beautiful finish in the cup.
             </p>
             <div className="scroll-cue" style={{ opacity: 1 - introProgress * 0.45 }}>
               <span className="scroll-cue-line" />
               <span>SCROLL TO EXPERIENCE</span>
+            </div>
+          </div>
+
+          <div className="chapter-stage" aria-live="polite" aria-atomic="true">
+            {storyChapters.map((chapter) => {
+              const opacity = getChapterOpacity(progress, chapter.start, chapter.end)
+              return (
+                <div
+                  className={`chapter-copy chapter-copy-${chapter.id}`}
+                  key={chapter.id}
+                  style={{
+                    opacity,
+                    '--chapter-lift': `${14 * (1 - opacity)}px`,
+                    visibility: opacity > 0 ? 'visible' : 'hidden',
+                  } as CSSProperties}
+                  aria-hidden={opacity === 0}
+                >
+                  <p className="chapter-kicker">{chapter.label}</p>
+                  <h2>{chapter.title}</h2>
+                  <p className="chapter-description">{chapter.description}</p>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="sequence-footer" aria-hidden="true">
+            <div className="sequence-progress">
+              <span className="sequence-progress-fill" style={{ transform: `scaleX(${progress})` }} />
             </div>
           </div>
 
@@ -313,24 +379,22 @@ function App() {
           <div className="highlight-grid">
             <article className="highlight-card">
               <span className="card-index">THE FORM</span>
-              <div className="card-mark" aria-hidden="true">
-                <svg viewBox="0 0 100 100">
-                  <path d="M66 8C80 8 91 20 89 37C86 60 65 86 42 92C26 96 12 86 11 69C9 44 39 9 66 8Z" fill="currentColor" />
-                  <path d="M23 79C38 62 52 48 77 21" fill="none" stroke="#f0ece2" strokeLinecap="round" strokeWidth="5" />
-                </svg>
-              </div>
+              <img className="card-photo" src={storyImages[0]} alt="Polished espresso grinder and portafilter" loading="lazy" />
+              <span className="card-photo-shade" aria-hidden="true" />
               <h3>Presence<br />with purpose.</h3>
               <p>Polished metal lines and a confident portafilter make the machine part of the ritual.</p>
             </article>
             <article className="highlight-card highlight-card-featured">
               <span className="card-index">THE POUR</span>
-              <div className="card-mark" aria-hidden="true">⌁</div>
+              <img className="card-photo" src={storyImages[1]} alt="Espresso flowing from a polished portafilter" loading="lazy" />
+              <span className="card-photo-shade" aria-hidden="true" />
               <h3>Let the moment<br />take its time.</h3>
               <p>Follow the extraction from its first thread to a crema-topped finish, frame by frame.</p>
             </article>
             <article className="highlight-card">
               <span className="card-index">THE PAUSE</span>
-              <div className="card-mark" aria-hidden="true">◌</div>
+              <img className="card-photo" src={storyImages[2]} alt="A finished cup of espresso in warm morning light" loading="lazy" />
+              <span className="card-photo-shade" aria-hidden="true" />
               <h3>Made for the<br />first sip.</h3>
               <p>A warmer, more considered start—one cup, one pause, and a little room to breathe.</p>
             </article>
@@ -349,13 +413,17 @@ function App() {
               <div className="spec-row"><span>Brew style</span><strong>Portafilter extraction</strong></div>
               <div className="spec-row"><span>Finish shown</span><strong>Polished metal</strong></div>
               <div className="spec-row"><span>Signature moment</span><strong>Crema-topped espresso</strong></div>
-              <div className="spec-row"><span>Scroll story</span><strong>205 frames · 2× slow pour</strong></div>
+              <div className="spec-row"><span>Scroll story</span><strong>A slow, frame-by-frame pour</strong></div>
             </div>
             <p className="spec-footnote">Technical measurements were not included with the supplied product visuals.</p>
           </div>
 
           <footer className="detail-footer">
             <a className="footer-brand" href="#sequence">COFFELIX<span>HOME ESPRESSO</span></a>
+            <div className="customer-care">
+              <span>CUSTOMER CARE</span>
+              <strong>1800 1890 15XX</strong>
+            </div>
             <a className="replay-link" href="#sequence">REPLAY THE POUR <span>↑</span></a>
           </footer>
         </div>
